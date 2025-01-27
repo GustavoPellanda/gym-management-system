@@ -123,8 +123,14 @@ class Interface:
         entry_email = tk.Entry(register_window, width=40)
         entry_email.grid(row=3, column=1, padx=10, pady=10)
 
-        tk.Button(register_window, text="Salvar", command=lambda: self.register_client.SetClientInfo(entry_cpf.get(), 
-                    {"name": entry_name.get(), "birth_date": entry_birth_date.get(), "email": entry_email.get()})).grid(row=4, column=1, padx=10, pady=20)
+        tk.Button(register_window, text="Salvar", command=lambda: self.register_client.SetClientInfo(
+            entry_cpf.get(),
+            {
+                "name": entry_name.get(),
+                "birth_date": entry_birth_date.get(),
+                "email": entry_email.get()
+            }
+        )).grid(row=4, column=1, padx=10, pady=20)
 
 
     def SelectSendWorkout(self):

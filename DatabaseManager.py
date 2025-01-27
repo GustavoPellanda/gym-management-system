@@ -1,64 +1,71 @@
-"""
-Classe responsável por gerenciar o banco de dados do sistema.
-"""
-
 import sqlite3
 
 class DatabaseManager:
-    def __init__(self, database_file="clients.db"):
-        self.connection = sqlite3.connect(database_file)
-        self.cursor = self.connection.cursor()
-        self._create_clients_table()
-
-    def _create_clients_table(self):
+    def __init__(self, db_name="smartfyt.db"):
         """
-        Cria a tabela de clientes no banco de dados, caso não exista.
+        Conecta-se ao banco de dados SQLite. Se o banco não existir, ele será criado.
+        """
+        self.conn = sqlite3.connect(db_name)
+        self.cursor = self.conn.cursor()
+        self.create_tables()
+
+    def create_tables(self):
+        """
+        Cria as tabelas necessárias no banco de dados, caso não existam.
         """
         self.cursor.execute("""
-        CREATE TABLE IF NOT EXISTS clients (
-            cpf TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            birth_date TEXT NOT NULL,
-            email TEXT NOT NULL
-        )
+            CREATE TABLE IF NOT EXISTS clients (
+                cpf TEXT PRIMARY KEY,
+                name TEXT,
+                birth_date TEXT,
+                email TEXT,
+                workout TEXT
+            )
         """)
-        self.connection.commit()
+        self.conn.commit()
 
     def SearchClient(self, cpf):
         """
         Busca um cliente no banco de dados pelo CPF.
         """
-        self.cursor.execute("SELECT * FROM clients WHERE cpf = ?", (cpf,))
-        return self.cursor.fetchone()
+        self.cursor.execute("SELECT * FROM clients WHERE cpf=?", (cpf,))
+        result = self.cursor.fetchone()
+        if result:
+            return {
+                "cpf": result[0],
+                "name": result[1],
+                "birth_date": result[2],
+                "email": result[3],
+                "workout": result[4]
+            }
+        return None
 
     def RegisterClient(self, cpf, info):
         """
         Registra um novo cliente no banco de dados.
         """
-        try:
-            self.cursor.execute(
-                "INSERT INTO clients (cpf, name, birth_date, email) VALUES (?, ?, ?, ?)",
-                (cpf, info["name"], info["birth_date"], info["email"])
-            )
-            self.connection.commit()
-        except sqlite3.IntegrityError:
+        if self.SearchClient(cpf):
             raise ValueError("Cliente já registrado.")
+        
+        self.cursor.execute("""
+            INSERT INTO clients (cpf, name, birth_date, email, workout)
+            VALUES (?, ?, ?, ?, ?)
+        """, (cpf, info['name'], info['birth_date'], info['email'], info.get('workout', None)))
+        self.conn.commit()
 
     def UpdateClientInfo(self, cpf, info):
         """
         Atualiza as informações de um cliente no banco de dados.
         """
-        if self.SearchClient(cpf) is None:
-            raise ValueError("Cliente não encontrado.")
+        self.cursor.execute("""
+            UPDATE clients
+            SET name=?, birth_date=?, email=?, workout=?
+            WHERE cpf=?
+        """, (info['name'], info['birth_date'], info['email'], info.get('workout', None), cpf))
+        self.conn.commit()
 
-        self.cursor.execute(
-            "UPDATE clients SET name = ?, birth_date = ?, email = ? WHERE cpf = ?",
-            (info["name"], info["birth_date"], info["email"], cpf)
-        )
-        self.connection.commit()
-
-    def __del__(self):
+    def close(self):
         """
-        Fecha a conexão com o banco de dados ao destruir o objeto.
+        Fecha a conexão com o banco de dados.
         """
-        self.connection.close()
+        self.conn.close()

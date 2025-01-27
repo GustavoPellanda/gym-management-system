@@ -19,10 +19,8 @@ class RegisterClient:
         Define informações adicionais para o cliente.
         Registra o cliente se ele não existir.
         """
-        if not cpf or not info or not info.get("name") or not info.get("birth_date") or not info.get("email"):
-            raise ValueError("CPF, Nome, Data de Nascimento e E-mail são obrigatórios.")
-
-        # Verifica se o cliente já existe no banco
+        if not cpf or not info:
+            raise ValueError("CPF e informações são obrigatórios.")
         if self.database_manager.SearchClient(cpf) is None:
             self.database_manager.RegisterClient(cpf, info)
         else:
