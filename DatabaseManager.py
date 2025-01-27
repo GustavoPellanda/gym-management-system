@@ -2,46 +2,63 @@
 Classe responsável por gerenciar o banco de dados do sistema.
 """
 
+import sqlite3
+
 class DatabaseManager:
-    def __init__(self):
-        self.clients = {}
+    def __init__(self, database_file="clients.db"):
+        self.connection = sqlite3.connect(database_file)
+        self.cursor = self.connection.cursor()
+        self._create_clients_table()
+
+    def _create_clients_table(self):
+        """
+        Cria a tabela de clientes no banco de dados, caso não exista.
+        """
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clients (
+            cpf TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            birth_date TEXT NOT NULL,
+            email TEXT NOT NULL
+        )
+        """)
+        self.connection.commit()
 
     def SearchClient(self, cpf):
         """
         Busca um cliente no banco de dados pelo CPF.
         """
-        return self.clients.get(cpf)
+        self.cursor.execute("SELECT * FROM clients WHERE cpf = ?", (cpf,))
+        return self.cursor.fetchone()
 
     def RegisterClient(self, cpf, info):
         """
         Registra um novo cliente no banco de dados.
         """
-        if cpf in self.clients:
+        try:
+            self.cursor.execute(
+                "INSERT INTO clients (cpf, name, birth_date, email) VALUES (?, ?, ?, ?)",
+                (cpf, info["name"], info["birth_date"], info["email"])
+            )
+            self.connection.commit()
+        except sqlite3.IntegrityError:
             raise ValueError("Cliente já registrado.")
-        self.clients[cpf] = info
 
     def UpdateClientInfo(self, cpf, info):
         """
         Atualiza as informações de um cliente no banco de dados.
         """
-        if cpf not in self.clients:
+        if self.SearchClient(cpf) is None:
             raise ValueError("Cliente não encontrado.")
-        self.clients[cpf] = info
 
-    def SearchWorkout(self, cpf):
-        """
-        Busca o treino associado a um cliente pelo CPF.
-        """
-        client = self.SearchClient(cpf)
-        if client:
-            return client.get("workout")
-        return None
+        self.cursor.execute(
+            "UPDATE clients SET name = ?, birth_date = ?, email = ? WHERE cpf = ?",
+            (info["name"], info["birth_date"], info["email"], cpf)
+        )
+        self.connection.commit()
 
-    def RegisterWorkout(self, cpf, workout):
+    def __del__(self):
         """
-        Associa um treino a um cliente no banco de dados.
+        Fecha a conexão com o banco de dados ao destruir o objeto.
         """
-        client = self.SearchClient(cpf)
-        if not client:
-            raise ValueError("Cliente não encontrado.")
-        client["workout"] = workout
+        self.connection.close()
