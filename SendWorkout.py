@@ -16,14 +16,19 @@ class SendWorkout:
         return client
 
     def WriteWorkout(self, cpf, workout):
-        """
-        Registra o treino para o cliente.
-        """
+
         if not workout:
             raise ValueError("Treino não pode ser vazio.")
-        client = self.GetClient(cpf)
+    
+    
+        client = self.database_manager.SearchClient(cpf)
+        if client is None:
+            raise ValueError("Cliente não encontrado.")
+
+    
         client["workout"] = workout
-        self.database_manager.UpdateClientInfo(cpf, client)
+        self.database_manager.update_client_info(cpf, client)  
+
 
     def SendWorkout(self, cpf, workout):
         """

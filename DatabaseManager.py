@@ -1,71 +1,71 @@
-import sqlite3
+import datetime
 
 class DatabaseManager:
-    def __init__(self, db_name="smartfyt.db"):
-        """
-        Conecta-se ao banco de dados SQLite. Se o banco não existir, ele será criado.
-        """
-        self.conn = sqlite3.connect(db_name)
-        self.cursor = self.conn.cursor()
-        self.create_tables()
+    def __init__(self):
+        self.clients = {}  
+        self.employees = {}  
 
-    def create_tables(self):
-        """
-        Cria as tabelas necessárias no banco de dados, caso não existam.
-        """
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS clients (
-                cpf TEXT PRIMARY KEY,
-                name TEXT,
-                birth_date TEXT,
-                email TEXT,
-                workout TEXT
-            )
-        """)
-        self.conn.commit()
+    def register_client(self, cpf, info):
+        if cpf in self.clients:
+            raise ValueError("Cliente já registrado.")
+        info['access_records'] = []
+        self.clients[cpf] = info
+
+    def validate_access_and_register_entry(self, cpf):
+        if cpf not in self.clients:
+            raise ValueError("Cliente não encontrado.")
+        
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.clients[cpf]['access_records'].append(current_time)
+        return f"Acesso permitido para {self.clients[cpf]['name']} às {current_time}."
+
+    def get_access_records(self, cpf):
+        if cpf not in self.clients:
+            raise ValueError("Cliente não encontrado.")
+        return self.clients[cpf]['access_records']
+
+    def SearchWorkout(self, cpf):
+        if cpf not in self.clients:
+            raise ValueError("Cliente não encontrado.")
+        return self.clients[cpf].get('workout', 'Nenhum treino atribuído.')
 
     def SearchClient(self, cpf):
-        """
-        Busca um cliente no banco de dados pelo CPF.
-        """
-        self.cursor.execute("SELECT * FROM clients WHERE cpf=?", (cpf,))
-        result = self.cursor.fetchone()
-        if result:
-            return {
-                "cpf": result[0],
-                "name": result[1],
-                "birth_date": result[2],
-                "email": result[3],
-                "workout": result[4]
-            }
-        return None
+        return self.clients.get(cpf)
 
-    def RegisterClient(self, cpf, info):
-        """
-        Registra um novo cliente no banco de dados.
-        """
-        if self.SearchClient(cpf):
-            raise ValueError("Cliente já registrado.")
+    def update_client_info(self, cpf, info):
+        if cpf not in self.clients:
+            raise ValueError("Cliente não encontrado.")
+        for key, value in info.items():
+            self.clients[cpf][key] = value
+
+    def register_employee(self, employee_id, name):
+        if employee_id in self.employees:
+            raise ValueError("Funcionário já registrado.")
+        self.employees[employee_id] = {
+            'name': name,
+            'records': []  
+        }
+        return f"Funcionário {name} registrado com sucesso."
+
+    def check_in(self, employee_id):
+        if employee_id not in self.employees:
+            raise ValueError("Funcionário não encontrado.")
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.employees[employee_id]['records'].append({'check_in': current_time, 'check_out': None})
+        return f"Entrada registrada para {self.employees[employee_id]['name']} às {current_time}."
+
+    def check_out(self, employee_id):
+        if employee_id not in self.employees:
+            raise ValueError("Funcionário não encontrado.")
         
-        self.cursor.execute("""
-            INSERT INTO clients (cpf, name, birth_date, email, workout)
-            VALUES (?, ?, ?, ?, ?)
-        """, (cpf, info['name'], info['birth_date'], info['email'], info.get('workout', None)))
-        self.conn.commit()
+        if not self.employees[employee_id]['records'] or self.employees[employee_id]['records'][-1]['check_out'] is not None:
+            raise ValueError("Hora de entrada não registrada ou já finalizada.")
 
-    def UpdateClientInfo(self, cpf, info):
-        """
-        Atualiza as informações de um cliente no banco de dados.
-        """
-        self.cursor.execute("""
-            UPDATE clients
-            SET name=?, birth_date=?, email=?, workout=?
-            WHERE cpf=?
-        """, (info['name'], info['birth_date'], info['email'], info.get('workout', None), cpf))
-        self.conn.commit()
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.employees[employee_id]['records'][-1]['check_out'] = current_time
+        return f"Saída registrada para {self.employees[employee_id]['name']} às {current_time}."
 
-    def close(self):
-        """
-        Fecha a conexão com o banco de dados.
-        """
-        self.conn.close()
+    def get_employee_data(self, employee_id):
+        if employee_id not in self.employees:
+            raise ValueError("Funcionário não encontrado.")
+        return self.employees[employee_id]
