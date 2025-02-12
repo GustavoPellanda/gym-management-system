@@ -4,6 +4,7 @@ from tkinter import messagebox, Menu
 from DatabaseManager import DatabaseManager
 from RegisterClient import RegisterClient
 from SendWorkout import SendWorkout
+import sqlite3
 
 class Interface:
     def __init__(self):
@@ -160,8 +161,11 @@ class Interface:
             "workout": None
         }
 
-        self.register_client.SetClientInfo(cpf, client_info)
-        self.message_label.config(text="Cliente cadastrado com sucesso.", fg="green")
+        try:
+            self.database_manager.register_client(cpf, client_info)
+            self.message_label.config(text="Cliente cadastrado com sucesso.", fg="green")
+        except sqlite3.Error as e:
+            self.message_label.config(text=f"Erro ao cadastrar cliente: {e}", fg="red")
 
     def display_message(self, message, color):
         self.message_label.config(text=message, fg=color)
@@ -199,14 +203,13 @@ class Interface:
             return
 
         try:
-            self.send_workout.SendWorkout(cpf, workout)
+            self.database_manager.update_client_info(cpf, {'workout': workout})
             self.message_label.config(text="Treino enviado com sucesso.", fg="green")
-        except ValueError as e:
-            self.message_label.config(text=str(e), fg="red")
-
-    def SelectFindClient(self):
-        for widget in self.main_frame.winfo_children():
-            widget.destroy()
+        except sqlite3.Error as e:
+            self.message_label.config(text=f"Erro ao enviar treino: {e}", fg="red")
+        def SelectFindClient(self):
+            for widget in self.main_frame.winfo_children():
+                widget.destroy()
 
     # Frame para o formulário de busca
         form_frame = tk.Frame(self.main_frame)
@@ -237,15 +240,20 @@ class Interface:
 
 
     def display_client_list(self):
-
         for widget in self.client_list_frame.winfo_children():
             if widget.winfo_class() == 'Label' and widget.cget("font") != ("Arial", 12, "bold"):
                 widget.destroy()
 
-
-        for cpf, client in self.database_manager.clients.items():
-            client_info = f"{client['name']} - CPF: {cpf}"
-            tk.Label(self.client_list_frame, text=client_info, font=("Arial", 10)).pack(anchor="w")
+        try:
+            clients = self.database_manager.get_all_clients()
+            if not clients:
+                tk.Label(self.client_list_frame, text="Nenhum cliente cadastrado.", fg="gray").pack()
+            else:
+                for client in clients:
+                    client_info = f"{client['name']} - CPF: {client['cpf']}"
+                    tk.Label(self.client_list_frame, text=client_info, font=("Arial", 10)).pack(anchor="w")
+        except Exception as e:
+            self.message_label.config(text=f"Erro ao buscar clientes: {e}", fg="red")
 
 
     def find_client(self, entry_cpf):
@@ -258,38 +266,83 @@ class Interface:
             self.message_label.config(text="CPF é obrigatório.", fg="red")
             return
 
-    # Verifica se o cliente existe
-        client = self.database_manager.SearchClient(cpf)
-        if client is None:
-            self.message_label.config(text="Cliente não encontrado.", fg="red")
-            return
+        try:
+            client = self.database_manager.SearchClient(cpf)
+            if client is None:
+                self.message_label.config(text="Cliente não encontrado.", fg="red")
+                return
 
-    # Cliente encontrado
-        self.message_label.config(text="Cliente encontrado com sucesso.", fg="green")
+            self.message_label.config(text="Cliente encontrado com sucesso.", fg="green")
 
-    # Exibe os dados do cliente
-        tk.Label(self.client_data_frame, text="Nome:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky="w", padx=5)
-        tk.Label(self.client_data_frame, text=client['name']).grid(row=0, column=1, sticky="w", padx=5)
+            # Exibe os dados do cliente
+            tk.Label(self.client_data_frame, text="Nome:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky="w", padx=5)
+            tk.Label(self.client_data_frame, text=client['name']).grid(row=0, column=1, sticky="w", padx=5)
 
-        tk.Label(self.client_data_frame, text="Treino:", font=("Arial", 10, "bold")).grid(row=1, column=0, sticky="w", padx=5)
-        workout = client.get('workout', 'Nenhum treino atribuído.')
-        tk.Label(self.client_data_frame, text=workout).grid(row=1, column=1, sticky="w", padx=5)
+            tk.Label(self.client_data_frame, text="Treino:", font=("Arial", 10, "bold")).grid(row=1, column=0, sticky="w", padx=5)
+            workout = client.get('workout', 'Nenhum treino atribuído.')
+            tk.Label(self.client_data_frame, text=workout).grid(row=1, column=1, sticky="w", padx=5)
 
-        if 'birth_date' in client:
-            tk.Label(self.client_data_frame, text="Data de Nascimento:", font=("Arial", 10, "bold")).grid(row=2, column=0, sticky="w", padx=5)
-            tk.Label(self.client_data_frame, text=client['birth_date']).grid(row=2, column=1, sticky="w", padx=5)
+            if 'birth_date' in client:
+                tk.Label(self.client_data_frame, text="Data de Nascimento:", font=("Arial", 10, "bold")).grid(row=2, column=0, sticky="w", padx=5)
+                tk.Label(self.client_data_frame, text=client['birth_date']).grid(row=2, column=1, sticky="w", padx=5)
 
-        if 'email' in client:
-            tk.Label(self.client_data_frame, text="E-mail:", font=("Arial", 10, "bold")).grid(row=3, column=0, sticky="w", padx=5)
-            tk.Label(self.client_data_frame, text=client['email']).grid(row=3, column=1, sticky="w", padx=5)
+            if 'email' in client:
+                tk.Label(self.client_data_frame, text="E-mail:", font=("Arial", 10, "bold")).grid(row=3, column=0, sticky="w", padx=5)
+                tk.Label(self.client_data_frame, text=client['email']).grid(row=3, column=1, sticky="w", padx=5)
 
-        if 'phone' in client:
-            tk.Label(self.client_data_frame, text="Telefone:", font=("Arial", 10, "bold")).grid(row=4, column=0, sticky="w", padx=5)
-            tk.Label(self.client_data_frame, text=client['phone']).grid(row=4, column=1, sticky="w", padx=5)
+            if 'phone' in client:
+                tk.Label(self.client_data_frame, text="Telefone:", font=("Arial", 10, "bold")).grid(row=4, column=0, sticky="w", padx=5)
+                tk.Label(self.client_data_frame, text=client['phone']).grid(row=4, column=1, sticky="w", padx=5)
+
+        except Exception as e:
+            self.message_label.config(text=f"Erro ao buscar cliente: {e}", fg="red")
 
 
+    def SelectFindClient(self):
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
+
+        # Frame para o formulário de busca
+        form_frame = tk.Frame(self.main_frame)  
+        form_frame.grid(row=0, column=0, padx=10, pady=10, sticky="n")
+
+        # Frame para exibir todos os clientes
+        self.client_list_frame = tk.Frame(self.main_frame)
+        self.client_list_frame.grid(row=0, column=1, padx=20, pady=10, sticky="n")
+
+        # Título da lista de clientes
+        tk.Label(self.client_list_frame, text="Clientes Cadastrados", font=("Arial", 12, "bold")).pack()
+
+        # Cria o message_label antes de chamar display_client_list
+        self.message_label = tk.Label(form_frame, text="", fg="red")
+        self.message_label.grid(row=2, column=1, pady=5)
+
+        # Inicializa a exibição da lista
         self.display_client_list()
 
+        # Campos de entrada e botões
+        tk.Label(form_frame, text="CPF:").grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        entry_cpf = tk.Entry(form_frame, width=30)
+        entry_cpf.grid(row=0, column=1, padx=10, pady=10)
+
+        self.client_data_frame = tk.Frame(form_frame)
+        self.client_data_frame.grid(row=3, column=0, columnspan=2, pady=10)
+
+        tk.Button(form_frame, text="Procurar", command=lambda: self.find_client(entry_cpf)).grid(row=1, column=1, pady=10)
+
+    def display_client_list(self):
+        for widget in self.client_list_frame.winfo_children():
+            if widget.winfo_class() == 'Label' and widget.cget("font") != ("Arial", 12, "bold"):
+                widget.destroy()
+
+        # Busca todos os clientes no banco de dados
+        try:
+            clients = self.database_manager.get_all_clients()  # Você precisa implementar esse método no DatabaseManager
+            for client in clients:
+                client_info = f"{client['name']} - CPF: {client['cpf']}"
+                tk.Label(self.client_list_frame, text=client_info, font=("Arial", 10)).pack(anchor="w")
+        except Exception as e:
+            self.message_label.config(text=f"Erro ao buscar clientes: {e}", fg="red")
 
     def SelectCheckWorkout(self):
         for widget in self.main_frame.winfo_children():
@@ -372,7 +425,7 @@ class Interface:
     def validate_access(self, entry_cpf):
         cpf = entry_cpf.get()
         if not cpf:
-            self.message_label.config(text="CPF e obrigatorio.", fg="red")
+            self.message_label.config(text="CPF é obrigatório.", fg="red")
             return
 
         try:
@@ -380,8 +433,8 @@ class Interface:
             self.message_label.config(text=result, fg="green")
 
             self.display_access_records(cpf)
-        except ValueError as e:
-            self.message_label.config(text=str(e), fg="red")
+        except sqlite3.Error as e:
+            self.message_label.config(text=f"Erro ao validar acesso: {e}", fg="red")
 
     def display_access_records(self, cpf):
         for widget in self.access_records_frame.winfo_children():
@@ -428,8 +481,8 @@ class Interface:
         try:
             result = self.employee_manager.register_employee(employee_id, employee_name)
             self.message_label.config(text=result, fg="green")
-        except ValueError as e:
-            self.message_label.config(text=str(e), fg="red")
+        except sqlite3.Error as e:
+            self.message_label.config(text=f"Erro ao registrar funcionário: {e}", fg="red")
     
     def SelectCheckInOut(self):
         for widget in self.main_frame.winfo_children():
@@ -459,8 +512,8 @@ class Interface:
         try:
             result = self.employee_manager.check_in(employee_id)
             self.message_label.config(text=result, fg="green")
-        except ValueError as e:
-            self.message_label.config(text=str(e), fg="red")
+        except sqlite3.Error as e:
+            self.message_label.config(text=f"Erro ao registrar entrada: {e}", fg="red")
 
     def check_out(self, entry_id):
         employee_id = entry_id.get()
@@ -471,8 +524,8 @@ class Interface:
         try:
             result = self.employee_manager.check_out(employee_id)
             self.message_label.config(text=result, fg="green")
-        except ValueError as e:
-            self.message_label.config(text=str(e), fg="red")
+        except sqlite3.Error as e:
+            self.message_label.config(text=f"Erro ao registrar saída: {e}", fg="red")
 
     def display_employee_records(self, entry_id):
         for widget in self.records_frame.winfo_children():
